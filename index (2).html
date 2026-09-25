@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>出席管理</title>
+<style>
+  :root{
+    --bg:#F6F5F1;
+    --panel:#FFFFFF;
+    --ink:#1F2421;
+    --ink-soft:#5C6560;
+    --line:#DDE1DA;
+    --accent:#3E5C4E;
+    --accent-soft:#E4EBE6;
+    --warn:#B4472B;
+    --warn-soft:#F5E3DD;
+    --late:#A67C1E;
+    --late-soft:#F4EBD8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#181B18; --panel:#20241F; --ink:#E9ECE7; --ink-soft:#9AA39A;
+      --line:#333A33; --accent:#7FA98C; --accent-soft:#26332B;
+      --warn:#D98467; --warn-soft:#332420; --late:#D9B45B; --late-soft:#332B1C;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#181B18; --panel:#20241F; --ink:#E9ECE7; --ink-soft:#9AA39A;
+    --line:#333A33; --accent:#7FA98C; --accent-soft:#26332B;
+    --warn:#D98467; --warn-soft:#332420; --late:#D9B45B; --late-soft:#332B1C;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Hiragino Sans","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    min-height:100%;
+  }
+  .wrap{ max-width:720px; margin:0 auto; padding:28px 18px 80px; }
+  header{
+    display:flex; align-items:baseline; justify-content:space-between;
+    margin-bottom:18px; gap:12px; flex-wrap:wrap;
+  }
+  h1{ font-size:22px; font-weight:700; margin:0; letter-spacing:.01em; }
+  .add-btn{
+    border:1px solid var(--accent); background:var(--accent); color:#fff;
+    border-radius:8px; padding:9px 16px; font-size:14px; font-weight:600;
+    cursor:pointer; white-space:nowrap;
+  }
+  .add-btn:hover{opacity:.9;}
+
+  .tabs{
+    display:flex; gap:4px; background:var(--accent-soft);
+    border-radius:10px; padding:4px; margin-bottom:22px; width:fit-content;
+  }
+  .tab-btn{
+    border:none; background:transparent; color:var(--ink-soft);
+    padding:8px 18px; border-radius:7px; font-size:14px; font-weight:600;
+    cursor:pointer;
+  }
+  .tab-btn.active{ background:var(--panel); color:var(--accent); }
+
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  .empty{
+    text-align:center; color:var(--ink-soft); padding:60px 20px;
+    border:1px dashed var(--line); border-radius:12px; font-size:14px; line-height:1.8;
+  }
+
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:18px 20px; margin-bottom:14px;
+  }
+  .card-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:14px; }
+  .subject-name{ font-size:17px; font-weight:700; margin:0 0 4px; word-break:break-word; }
+  .subject-meta{ font-size:13px; color:var(--ink-soft); display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .syllabus-link{ color:var(--accent); text-decoration:none; font-weight:600; }
+  .syllabus-link:hover{ text-decoration:underline; }
+
+  .frac{ font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; text-align:right; line-height:1.1; white-space:nowrap; }
+  .frac small{ font-size:13px; font-weight:600; color:var(--ink-soft); }
+  .frac-label{ font-size:11px; color:var(--ink-soft); text-align:right; margin-top:2px; }
+
+  .bar-track{ height:6px; background:var(--line); border-radius:99px; overflow:hidden; margin-bottom:16px; }
+  .bar-fill{ height:100%; background:var(--accent); border-radius:99px; transition:width .25s ease; }
+  .bar-fill.low{ background:var(--warn); }
+
+  .actions{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+  .actions button{
+    border:1px solid var(--line); background:transparent; color:var(--ink);
+    border-radius:8px; padding:10px 4px; font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .actions button:active{ transform:scale(.97); }
+  .btn-present:hover{ background:var(--accent-soft); border-color:var(--accent); }
+  .btn-late:hover{ background:var(--late-soft); border-color:var(--late); }
+  .btn-absent:hover{ background:var(--warn-soft); border-color:var(--warn); }
+
+  .card-footer{
+    display:flex; justify-content:space-between; align-items:center;
+    margin-top:14px; padding-top:12px; border-top:1px solid var(--line); gap:10px; flex-wrap:wrap;
+  }
+  .counts{ font-size:12px; color:var(--ink-soft); display:flex; gap:10px; }
+  .footer-btns{ display:flex; gap:4px; }
+  .icon-btn{ background:none; border:none; color:var(--ink-soft); font-size:12px; cursor:pointer; padding:4px 6px; }
+  .icon-btn:hover{ color:var(--ink); }
+  .icon-btn.danger:hover{ color:var(--warn); }
+
+  /* timetable view */
+  .timetable-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
+  table.timetable{ border-collapse:collapse; width:100%; min-width:560px; }
+  table.timetable th, table.timetable td{
+    border:1px solid var(--line); padding:6px; text-align:center; vertical-align:top;
+  }
+  table.timetable th{ background:var(--accent-soft); font-size:13px; font-weight:700; padding:10px 6px; }
+  table.timetable td.period-cell{ background:var(--accent-soft); font-size:12px; font-weight:700; color:var(--ink-soft); width:44px; }
+  table.timetable td.slot{ height:64px; width:110px; padding:4px; }
+  .slot-chip{
+    height:100%; width:100%; border-radius:8px; border:1px solid var(--line);
+    background:var(--bg); padding:6px 8px; cursor:pointer; text-align:left;
+    display:flex; flex-direction:column; justify-content:center; gap:2px;
+  }
+  .slot-chip:hover{ border-color:var(--accent); }
+  .slot-chip .name{ font-size:12.5px; font-weight:700; line-height:1.25; word-break:break-word; }
+  .slot-chip .sub{ font-size:11px; color:var(--ink-soft); }
+  .slot-chip.low{ border-left:3px solid var(--warn); }
+  .slot-empty{ height:100%; width:100%; border-radius:8px; cursor:pointer; }
+  .slot-empty:hover{ background:var(--accent-soft); }
+
+  table.timetable tr.ondemand-row td.period-cell{ font-size:11px; }
+  table.timetable td.ondemand-cell{ padding:5px; vertical-align:top; min-height:64px; }
+  .ondemand-cell-inner{ display:flex; flex-direction:column; gap:5px; }
+  .ondemand-chip{
+    border-radius:7px; border:1px solid var(--line);
+    background:var(--bg); padding:6px 8px; cursor:pointer; text-align:left;
+    display:flex; flex-direction:column; gap:1px; width:100%;
+  }
+  .ondemand-chip:hover{ border-color:var(--accent); }
+  .ondemand-chip .name{ font-size:12px; font-weight:700; word-break:break-word; line-height:1.25; }
+  .ondemand-chip .sub{ font-size:10.5px; color:var(--ink-soft); }
+  .ondemand-chip.low{ border-left:3px solid var(--warn); }
+  .ondemand-add{
+    border-radius:7px; border:1px dashed var(--line);
+    background:transparent; color:var(--ink-soft); cursor:pointer;
+    font-size:11px; font-weight:600; padding:6px 4px; width:100%;
+  }
+  .ondemand-add:hover{ border-color:var(--accent); background:var(--accent-soft); color:var(--accent); }
+
+  dialog{
+    border:none; border-radius:14px; padding:0; background:var(--panel); color:var(--ink);
+    max-width:380px; width:90vw;
+  }
+  dialog::backdrop{ background:rgba(0,0,0,.4); }
+  .dialog-body{ padding:22px; max-height:82vh; overflow-y:auto; }
+  .dialog-body h2{ margin:0 0 16px; font-size:16px; }
+  .field{ margin-bottom:14px; }
+  .field label{ display:block; font-size:12px; color:var(--ink-soft); margin-bottom:5px; font-weight:600; }
+  .field input, .field select{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px;
+    background:var(--bg); color:var(--ink); font-size:15px;
+  }
+  .field-row{ display:flex; gap:10px; }
+  .field-row .field{ flex:1; }
+  .checkbox-field{ margin-bottom:18px; }
+  .checkbox-label{
+    display:flex; align-items:center; gap:8px; cursor:pointer;
+    font-size:14px; font-weight:600; color:var(--ink);
+  }
+  .checkbox-label input{ width:16px; height:16px; accent-color:var(--accent); cursor:pointer; }
+  .dialog-row{ display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
+  .dialog-row button{
+    border-radius:8px; padding:8px 16px; font-size:14px; cursor:pointer;
+    border:1px solid var(--line); background:transparent; color:var(--ink);
+  }
+  .dialog-row .primary{ background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+
+  .quick-panel{ padding:18px 22px 22px; }
+  .quick-panel h2{ margin:0 0 4px; font-size:16px; }
+  .quick-panel .qp-meta{ font-size:12px; color:var(--ink-soft); margin-bottom:16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>授業出席管理</h1>
+    <button class="add-btn" id="openAdd">+ 科目を追加</button>
+  </header>
+
+  <div class="tabs">
+    <button class="tab-btn" data-view="list">リスト</button>
+    <button class="tab-btn active" data-view="timetable">時間割</button>
+  </div>
+
+  <div class="view" id="view-list">
+    <div id="list"></div>
+    <div class="empty" id="emptyState" style="display:none;">
+      まだ科目が登録されていません。<br>「+ 科目を追加」から授業を登録してください。
+    </div>
+  </div>
+
+  <div class="view active" id="view-timetable">
+    <div class="timetable-wrap">
+      <table class="timetable" id="timetableTable"></table>
+    </div>
+  </div>
+</div>
+
+<dialog id="addDialog">
+  <div class="dialog-body">
+    <h2 id="dialogTitle">科目を追加</h2>
+    <div class="field">
+      <label>科目名</label>
+      <input id="subjectInput" type="text" placeholder="例：都市交通論" maxlength="40">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>曜日</label>
+        <select id="dayInput">
+          <option value="">未設定</option>
+          <option value="月">月</option>
+          <option value="火">火</option>
+          <option value="水">水</option>
+          <option value="木">木</option>
+          <option value="金">金</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>時限（任意）</label>
+        <select id="periodInput">
+          <option value="">未設定</option>
+          <option value="1">1限</option>
+          <option value="2">2限</option>
+          <option value="3">3限</option>
+          <option value="4">4限</option>
+          <option value="5">5限</option>
+          <option value="6">6限</option>
+        </select>
+      </div>
+    </div>
+    <div class="field checkbox-field">
+      <label class="checkbox-label">
+        <input type="checkbox" id="ondemandInput">
+        <span>オンデマンド配信の授業</span>
+      </label>
+    </div>
+    <div class="field">
+      <label>総授業回数</label>
+      <input id="totalInput" type="number" min="1" max="30" value="14">
+    </div>
+    <div class="field">
+      <label>シラバスURL（任意）</label>
+      <input id="syllabusInput" type="url" placeholder="https://...">
+    </div>
+    <div class="dialog-row">
+      <button id="cancelAdd">キャンセル</button>
+      <button class="primary" id="confirmAdd">保存</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="quickDialog">
+  <div class="quick-panel">
+    <h2 id="qpName"></h2>
+    <div class="qp-meta" id="qpMeta"></div>
+    <div class="actions">
+      <button class="btn-present" id="qpPresent">出席</button>
+      <button class="btn-late" id="qpLate">遅刻</button>
+      <button class="btn-absent" id="qpAbsent">欠席</button>
+    </div>
+    <div class="dialog-row">
+      <button id="qpClose">閉じる</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+const STORAGE_KEY = "attendance-tracker-subjects";
+const DAYS = ["月","火","水","木","金"];
+const PERIODS = [1,2,3,4,5,6];
+
+function loadSubjects(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return parsed.map(s => ({
+      id: s.id,
+      name: s.name,
+      day: s.day === "オンデマンド" ? "" : (s.day || ""),
+      period: s.period || "",
+      isOndemand: s.day === "オンデマンド" ? true : !!s.isOndemand,
+      totalClasses: s.totalClasses || 14,
+      present: s.present || 0,
+      late: s.late || 0,
+      absent: s.absent || 0,
+      syllabusUrl: s.syllabusUrl || ""
+    }));
+  }catch(e){
+    console.error("読み込みエラー", e);
+    return [];
+  }
+}
+function saveSubjects(subjects){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(subjects)); }
+  catch(e){ console.error("保存エラー", e); }
+}
+
+let subjects = loadSubjects();
+let editingId = null;
+
+function escapeHtml(str){
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function isLow(s){
+  const total = s.totalClasses || 1;
+  const effective = s.present + s.late * 0.5;
+  return (effective / total) < (2/3);
+}
+
+/* ---------- list view ---------- */
+function renderList(){
+  const list = document.getElementById("list");
+  const empty = document.getElementById("emptyState");
+  list.innerHTML = "";
+
+  if(subjects.length === 0){
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+
+  subjects.forEach(s => {
+    const total = s.totalClasses || 14;
+    const low = isLow(s);
+    const metaParts = [];
+    if(s.day || s.period) metaParts.push(`${s.day}${s.period ? s.period + "限" : ""}`);
+    if(s.isOndemand) metaParts.push("オンデマンド");
+    metaParts.push(`全${total}回`);
+
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="card-top">
+        <div>
+          <p class="subject-name">${escapeHtml(s.name)}</p>
+          <div class="subject-meta">
+            <span>${metaParts.join(" ・ ")}</span>
+            ${s.syllabusUrl ? `<a class="syllabus-link" href="${escapeHtml(s.syllabusUrl)}" target="_blank" rel="noopener">シラバス ↗</a>` : ""}
+          </div>
+        </div>
+        <div>
+          <div class="frac" style="color:${low ? 'var(--warn)' : 'var(--accent)'}">${s.present}<small> / ${total}回</small></div>
+          <div class="frac-label">出席</div>
+        </div>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill ${low ? 'low' : ''}" style="width:${Math.min(100, Math.round((s.present/total)*100))}%"></div>
+      </div>
+      <div class="actions">
+        <button class="btn-present" data-id="${s.id}" data-type="present">出席</button>
+        <button class="btn-late" data-id="${s.id}" data-type="late">遅刻</button>
+        <button class="btn-absent" data-id="${s.id}" data-type="absent">欠席</button>
+      </div>
+      <div class="card-footer">
+        <div class="counts">
+          <span>出席 ${s.present}</span>
+          <span>遅刻 ${s.late}</span>
+          <span>欠席 ${s.absent}</span>
+        </div>
+        <div class="footer-btns">
+          <button class="icon-btn" data-id="${s.id}" data-action="edit">編集</button>
+          <button class="icon-btn danger" data-id="${s.id}" data-action="delete">削除</button>
+        </div>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+document.getElementById("list").addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if(!btn) return;
+  const id = btn.dataset.id;
+  if(!id) return;
+
+  if(btn.dataset.type){
+    mark(id, btn.dataset.type);
+  }
+  if(btn.dataset.action === "delete"){
+    const s = subjects.find(x => x.id === id);
+    if(s && confirm(`「${s.name}」を削除しますか？記録も全て消えます。`)){
+      subjects = subjects.filter(x => x.id !== id);
+      saveSubjects(subjects);
+      renderAll();
+    }
+  }
+  if(btn.dataset.action === "edit"){
+    openEdit(id);
+  }
+});
+
+function mark(id, type){
+  const s = subjects.find(x => x.id === id);
+  if(s){
+    s[type]++;
+    saveSubjects(subjects);
+    renderAll();
+  }
+}
+
+/* ---------- timetable view ---------- */
+function renderTimetable(){
+  const table = document.getElementById("timetableTable");
+  let html = "<thead><tr><th>時限</th>";
+  DAYS.forEach(d => html += `<th>${d}</th>`);
+  html += "</tr></thead><tbody>";
+
+  PERIODS.forEach(p => {
+    html += `<tr><td class="period-cell">${p}限</td>`;
+    DAYS.forEach(d => {
+      const match = subjects.find(s => !s.isOndemand && s.day === d && String(s.period) === String(p));
+      if(match){
+        const low = isLow(match);
+        html += `<td class="slot">
+          <button class="slot-chip ${low ? 'low' : ''}" data-id="${match.id}">
+            <span class="name">${escapeHtml(match.name)}</span>
+            <span class="sub">${match.present}/${match.totalClasses || 14}回</span>
+          </button>
+        </td>`;
+      }else{
+        html += `<td class="slot"><div class="slot-empty" data-day="${d}" data-period="${p}"></div></td>`;
+      }
+    });
+    html += "</tr>";
+  });
+
+  html += `<tr class="ondemand-row"><td class="period-cell">オンデマンド</td>`;
+  DAYS.forEach(d => {
+    const items = subjects.filter(s => s.isOndemand && s.day === d);
+    let inner = `<div class="ondemand-cell-inner">`;
+    items.forEach(s => {
+      const low = isLow(s);
+      inner += `<button class="ondemand-chip ${low ? 'low' : ''}" data-id="${s.id}">
+        <span class="name">${escapeHtml(s.name)}</span>
+        <span class="sub">${s.present}/${s.totalClasses || 14}回</span>
+      </button>`;
+    });
+    inner += `<button class="ondemand-add" data-day="${d}">+ 追加</button></div>`;
+    html += `<td class="ondemand-cell">${inner}</td>`;
+  });
+  html += `</tr>`;
+
+  html += "</tbody>";
+  table.innerHTML = html;
+}
+
+document.getElementById("timetableTable").addEventListener("click", (e) => {
+  const chip = e.target.closest(".slot-chip, .ondemand-chip");
+  if(chip){
+    openQuickPanel(chip.dataset.id);
+    return;
+  }
+  const empty = e.target.closest(".slot-empty");
+  if(empty){
+    openAddDialog({ day: empty.dataset.day, period: empty.dataset.period });
+    return;
+  }
+  const addBtn = e.target.closest(".ondemand-add");
+  if(addBtn){
+    openAddDialog({ day: addBtn.dataset.day, isOndemand: true });
+  }
+});
+
+const quickDialog = document.getElementById("quickDialog");
+let quickId = null;
+function openQuickPanel(id){
+  const s = subjects.find(x => x.id === id);
+  if(!s) return;
+  quickId = id;
+  document.getElementById("qpName").textContent = s.name;
+  const total = s.totalClasses || 14;
+  const dayPart = `${s.day}${s.period ? s.period + "限" : ""}`;
+  const dayLabel = s.isOndemand ? (dayPart ? `${dayPart}・オンデマンド` : "オンデマンド") : dayPart;
+  document.getElementById("qpMeta").textContent =
+    `${dayLabel} ・ 出席 ${s.present}/${total}回 ・ 遅刻${s.late} ・ 欠席${s.absent}`;
+  quickDialog.showModal();
+}
+["present","late","absent"].forEach(type => {
+  document.getElementById("qp" + type[0].toUpperCase() + type.slice(1)).addEventListener("click", () => {
+    if(quickId){ mark(quickId, type); openQuickPanel(quickId); }
+  });
+});
+document.getElementById("qpClose").addEventListener("click", () => quickDialog.close());
+
+/* ---------- tabs ---------- */
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("view-" + btn.dataset.view).classList.add("active");
+  });
+});
+
+/* ---------- add / edit dialog ---------- */
+const addDialog = document.getElementById("addDialog");
+const subjectInput = document.getElementById("subjectInput");
+const dayInput = document.getElementById("dayInput");
+const periodInput = document.getElementById("periodInput");
+const ondemandInput = document.getElementById("ondemandInput");
+const totalInput = document.getElementById("totalInput");
+const syllabusInput = document.getElementById("syllabusInput");
+
+document.getElementById("openAdd").addEventListener("click", () => openAddDialog());
+
+function openAddDialog(prefill){
+  editingId = null;
+  document.getElementById("dialogTitle").textContent = "科目を追加";
+  subjectInput.value = "";
+  dayInput.value = (prefill && prefill.day) || "";
+  periodInput.value = (prefill && prefill.period) || "";
+  ondemandInput.checked = !!(prefill && prefill.isOndemand);
+  totalInput.value = 14;
+  syllabusInput.value = "";
+  addDialog.showModal();
+  subjectInput.focus();
+}
+
+function openEdit(id){
+  const s = subjects.find(x => x.id === id);
+  if(!s) return;
+  editingId = id;
+  document.getElementById("dialogTitle").textContent = "科目を編集";
+  subjectInput.value = s.name;
+  dayInput.value = s.day;
+  periodInput.value = s.period;
+  ondemandInput.checked = !!s.isOndemand;
+  totalInput.value = s.totalClasses || 14;
+  syllabusInput.value = s.syllabusUrl;
+  addDialog.showModal();
+}
+
+document.getElementById("cancelAdd").addEventListener("click", () => addDialog.close());
+document.getElementById("confirmAdd").addEventListener("click", saveSubjectForm);
+subjectInput.addEventListener("keydown", (e) => {
+  if(e.key === "Enter"){ e.preventDefault(); saveSubjectForm(); }
+});
+
+function saveSubjectForm(){
+  const name = subjectInput.value.trim();
+  if(!name) return;
+  const total = parseInt(totalInput.value, 10) || 14;
+
+  if(editingId){
+    const s = subjects.find(x => x.id === editingId);
+    if(s){
+      s.name = name;
+      s.day = dayInput.value;
+      s.period = periodInput.value;
+      s.isOndemand = ondemandInput.checked;
+      s.totalClasses = total;
+      s.syllabusUrl = syllabusInput.value.trim();
+    }
+  }else{
+    subjects.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      name,
+      day: dayInput.value,
+      period: periodInput.value,
+      isOndemand: ondemandInput.checked,
+      totalClasses: total,
+      present: 0, late: 0, absent: 0,
+      syllabusUrl: syllabusInput.value.trim()
+    });
+  }
+  saveSubjects(subjects);
+  addDialog.close();
+  renderAll();
+}
+
+function renderAll(){
+  renderList();
+  renderTimetable();
+}
+renderAll();
+</script>
+</body>
+</html>
